@@ -153,11 +153,45 @@ class GridGameGUI:
                                             font=("Arial", 8, "bold"))
 
         for fx, fy in self.env.food_positions:
-            offset = self.cell_size * 0.25
-            x1 = fx * self.cell_size + offset
-            y1 = (self.env.height - 1 - fy) * self.cell_size + offset
-            self.canvas.create_oval(x1, y1, x1 + self.cell_size * 0.5, y1 + self.cell_size * 0.5, fill="#f59e0b",
-                                    outline="#d97706")
+                offset = self.cell_size * 0.25
+                x1 = fx * self.cell_size + offset
+                y1 = (self.env.height - 1 - fy) * self.cell_size + offset
+
+                self.canvas.create_oval(
+                    x1,
+                    y1,
+                    x1 + self.cell_size * 0.5,
+                    y1 + self.cell_size * 0.5,
+                    fill="#f59e0b",
+                    outline="#d97706"
+                    )
+
+        for tx, ty in self.env.toxic_traps:
+            center_x = tx * self.cell_size + self.cell_size / 2
+            center_y = (
+                self.env.height - 1 - ty
+            ) * self.cell_size + self.cell_size / 2
+
+            size = self.cell_size * 0.28
+
+            self.canvas.create_polygon(
+                center_x, center_y - size,
+                center_x + size, center_y,
+                center_x, center_y + size,
+                center_x - size, center_y,
+                fill="#9333ea",
+                outline="#581c87",
+                width=2
+            )
+
+            if self.cell_size >= 40:
+                self.canvas.create_text(
+                    center_x,
+                    center_y,
+                    text="T",
+                    fill="white",
+                    font=("Arial", 9, "bold")
+                )
 
         for ox, oy in self.env.opponents:
             offset = self.cell_size * 0.2
