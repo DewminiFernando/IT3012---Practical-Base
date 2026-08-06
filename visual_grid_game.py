@@ -1,6 +1,7 @@
 # visual_grid_game.py
 import random
 import tkinter as tk
+from agent import SimpleReflexAgent, ModelBasedAgent
 
 
 class VisualGridHuntGame:
@@ -11,6 +12,8 @@ class VisualGridHuntGame:
         self.height = height
         self.agent_pos = [0, 0]  # Starting position (x, y)
 
+        self.facing = "Up" 
+        
         if custom_walls is not None:
             self.walls = set(custom_walls)
         else:
@@ -47,17 +50,36 @@ class VisualGridHuntGame:
             if trap_pos != (0, 0) and trap_pos not in self.walls and trap_pos not in self.food_positions:
                 self.toxic_traps.add(trap_pos)
 
-    def get_percept(self) -> dict:
+    def get_percept(self):
+        # Movement direction based on where the agent is facing
+        direction_offsets = {
+            "Up": (0, 1),
+            "Right": (1, 0),
+            "Down": (0, -1),
+            "Left": (-1, 0)
+        }
+
+        x, y = self.agent_pos
+        dx, dy = direction_offsets[self.facing]
+
+        # Cell directly in front of the agent
+        next_position = (x + dx, y + dy)
+
+        # Check whether the next cell is outside the grid
+        outside_grid = not (
+            0 <= next_position[0] < self.width
+            and 0 <= next_position[1] < self.height
+        )
+
+        # A boundary or wall is considered a wall ahead
+        wall_ahead = outside_grid or next_position in self.walls
+
+        # Check only the current cell for food
+        food_here = tuple(self.agent_pos) in self.food_positions
+
         return {
-            'agent_pos': list(self.agent_pos),
-            'opponent_positions': [list(op) for op in self.opponents],
-            'smells_food': tuple(self.agent_pos) in self.food_positions,
-            'hit_wall': tuple(self.agent_pos) in self.walls,
-            'collision': self.collision,
-            'score': self.score,
-            'remaining_food': len(self.food_positions),
-            'toxic_traps': list(self.toxic_traps),
-            'smells_toxin': tuple(self.agent_pos) in self.toxic_traps
+            "wall_ahead": wall_ahead,
+            "food_here": food_here
         }
 
     def execute_action(self, action: str):
@@ -104,7 +126,30 @@ class VisualGridHuntGame:
     def is_done(self) -> bool:
         return len(self.food_positions) == 0 or self.steps >= 60 or self.collision
 
+    def execute_reflex_action(self, action):
+        directions = ["Up", "Right", "Down", "Left"]
 
+        if action == "TurnLeft":
+            current_index = directions.index(self.facing)
+            self.facing = directions[(current_index - 1) % 4]
+            self.steps += 1
+
+        elif action == "TurnRight":
+            current_index = directions.index(self.facing)
+            self.facing = directions[(current_index + 1) % 4]
+            self.steps += 1
+
+        elif action == "MoveForward":
+            # Use the existing movement code
+            self.execute_action(self.facing)
+
+        elif action == "Suck":
+            if tuple(self.agent_pos) in self.food_positions:
+                self.food_positions.remove(tuple(self.agent_pos))
+                self.score += 20
+
+            self.steps += 1
+            
 class GridGameGUI:
     """Tkinter wrapper that dynamically scales cell sizes to keep larger grids on screen."""
 
@@ -114,6 +159,8 @@ class GridGameGUI:
 
         self.env = VisualGridHuntGame(width=width, height=height, num_food=num_food, num_opponents=num_opponents,
                                       custom_walls=walls)
+
+        self.agent = ModelBasedAgent()
 
         # Dynamically calculate cell size so the total canvas fits nicely within a 600x600 window ceiling
         max_canvas_dim = 600
@@ -212,8 +259,17 @@ class GridGameGUI:
 
         def step():
             if not self.env.is_done():
-                action = random.choice(['Up', 'Down', 'Left', 'Right'])
-                self.env.execute_action(action)
+                percept = self.env.get_percept()
+                action = self.agent.sense_and_act(percept)
+
+                print(
+                    "Position:", self.env.agent_pos,
+                    "| Facing:", self.env.facing,
+                    "| Percept:", percept,
+                    "| Action:", action
+                )
+
+                self.env.execute_reflex_action(action)
 
                 self.draw_grid()
                 self.label.config(text=f"Score: {self.env.score} | Steps: {self.env.steps} | Action: {action}")
